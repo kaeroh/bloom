@@ -24,6 +24,7 @@ int32_t scale_h(float fraction) {
 }
 
 int main() {
+    char font_dir[128];
     state.active_view = EXPLORING;
     state.exploring.active_window = EXPLORING_NOTES_LIST;
     
@@ -91,7 +92,8 @@ int main() {
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
     state.style.FontSizeBase = 20.0f;
     //io.Fonts->AddFontDefault();
-    io.Fonts->AddFontFromFileTTF("./res/NotoSerif-Regular.ttf");
+    snprintf(font_dir, 128, "%s/.local/share/bloom/NotoSerif-Regular.ttf", getenv("HOME"));
+    io.Fonts->AddFontFromFileTTF(font_dir);
     //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf");
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf");
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf");
@@ -213,7 +215,7 @@ void handle_keypress(SDL_Event *ev) {
     case EXPLORING:
         switch (transition) {
         case TO_REVIEW:
-            state.review.note_review = cez_load_review_from_array(state.exploring.selected_notes, state.exploring.selected_notes_count);
+            state.review.note_review = cez_load_review_from_array(state.exploring.selected_notes, state.exploring.selected_notes_count, true);
             state.active_view = REVIEWING;
             break;
         case TO_EXPLORING:

@@ -72,7 +72,7 @@ typedef struct NoteReview {
     uint64_t current_flash;
     int32_t correct;
     int32_t incorrect;
-    Note *notes;
+    Note **notes;
     uint64_t note_count;
     bool showing_front;
 } NoteReview;
@@ -87,7 +87,7 @@ void cez_shutdown();
 // returns NULL if no note was found
 const Note *get_note(const char *relative_path);
 const Notes *get_notes();
-const NoteReview *cez_load_review_from_array(size_t *array, size_t count);
+const NoteReview *cez_load_review_from_array(size_t *array, size_t count, bool shuffle);
 const Review *cez_load_review_from_node(const Note *parent);
 const Review *cez_load_review_from_dir(const char *relative_path);
 void cez_show_back();

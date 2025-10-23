@@ -8,7 +8,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-
 #define START_CAPACITY 128
 #define START_FLASH_CAPACITY 8
 #define READ_BUFF_CAP 1024
@@ -107,26 +106,65 @@ const Note *get_note(const char *relative_path) {
     return NULL;
 }
 
-const NoteReview *cez_load_review_from_array(size_t *array, size_t count) {
+void shuffle_notes(Note **notes, uint64_t len) {
+    if (len < 1) return;
+    Note *tmp = NULL;
+    uint64_t b = 0;
+    for (uint64_t i = len-1; i > 1; i--) {
+        b = rand()%(i-1);
+        tmp = notes[b];
+        cez_log(INFO, "Swapping: %lu, %lu", b, i);
+
+        notes[b] = notes[i];
+        notes[i] = tmp;
+    }
+}
+
+void shuffle_flashes(Flash *flashes, uint64_t len) {
+    if (len < 1) return;
+    Flash tmp = {};
+    uint64_t b = 0;
+    cez_log(INFO, "shuffling: %lu", len);
+    for (uint64_t i = len-1; i > 1; i--) {
+        b = rand()%(i-1);
+        tmp = flashes[b];
+        cez_log(INFO, "Swapping: %lu, %lu", b, i);
+
+        flashes[b] = flashes[i];
+        flashes[i] = tmp;
+    }
+}
+
+const NoteReview *cez_load_review_from_array(size_t *array, size_t count, bool shuffle) {
     if (count < 1) {
         return NULL;
     }
-    void *alloc = realloc(note_review.notes, sizeof(Note) * count);
+    void *alloc = realloc(note_review.notes, sizeof(Note*) * count);
     if (!alloc) {
         cez_log(ERROR, "failed memory allocation in cez_load_review_from_array");
         return NULL;
     }
-    note_review.notes = (Note*)alloc;
+    note_review.notes = (Note**)alloc;
     for (size_t i = 0; i < count; i++) {
-        memcpy(&note_review.notes[i], graph.notes[array[i]], sizeof(Note));
+        memcpy(&note_review.notes[i], &graph.notes[array[i]], sizeof(Note*));
     }
+
+    if (shuffle) {
+        for (uint64_t i = 0; i < count; i++) {
+            cez_log(INFO, "SHUFFLING");
+            shuffle_flashes(note_review.notes[i]->flashes, note_review.notes[i]->flash_count);
+        }
+
+        shuffle_notes(note_review.notes, count);
+    }
+
     note_review.note_count = count;
     note_review.current_note = 0;
     note_review.current_flash = 0;
     note_review.correct = 0;
     note_review.incorrect = 0;
     note_review.showing_front = true;
-    while (note_review.notes[note_review.current_note].flash_count < 1 && !cez_review_complete()) {
+    while (note_review.notes[note_review.current_note]->flash_count < 1 && !cez_review_complete()) {
         note_review.current_note ++;
     }
     return (const NoteReview*)&note_review;
@@ -139,7 +177,7 @@ void cez_review_next_flash() {
         return;
     }  
 
-    if (!(note_review.current_flash + 1 < note_review.notes[note_review.current_note].flash_count)) {
+    if (!(note_review.current_flash + 1 < note_review.notes[note_review.current_note]->flash_count)) {
         note_review.current_note ++;
         note_review.current_flash = 0;
         note_review.showing_front = true;
@@ -148,7 +186,7 @@ void cez_review_next_flash() {
         note_review.showing_front = true;
     }
 
-    while (note_review.notes[note_review.current_note].flash_count < 1 && !cez_review_complete()) {
+    while (!cez_review_complete() && note_review.notes[note_review.current_note]->flash_count < 1) {
         note_review.current_note ++;
         note_review.current_flash = 0;
         note_review.showing_front = true;
@@ -391,6 +429,7 @@ bool read_file(const char *abs_path, Graph *graph) {
                         new_note->flashes[new_cloze_index].data.cloze.review_text, 
                         new_note->flashes[new_cloze_index].data.cloze.view_text
                        );
+                last_newline_index = index;
             }
             break;
         default:

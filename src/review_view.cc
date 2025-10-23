@@ -35,10 +35,10 @@ void draw_review(
     if (cez_review_complete()) {
         ImGui::Text("Review complete");
     } else {
-        ImGui::Text("%s", state->note_review->notes[state->note_review->current_note].relative_path);
+        ImGui::Text("%s", state->note_review->notes[state->note_review->current_note]->relative_path);
 
         display_note_for_review(
-                &state->note_review->notes[state->note_review->current_note], 
+                state->note_review->notes[state->note_review->current_note], 
                 state->note_review->current_flash, 
                 state->note_review->showing_front);
     }
