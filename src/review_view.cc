@@ -51,13 +51,18 @@ void draw_review(
     ImGui::SetWindowPos(ImVec2(scale_w(0.70), scale_h(0.02)));
 
     if (cez_review_complete()) {
-        snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu completed", state->note_review->current_note, state->note_review->note_count);
+        snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu notes completed", state->note_review->current_note, state->note_review->note_count);
     } else {
-        snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu completed", state->note_review->current_note + 1, state->note_review->note_count);
+        snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu notes completed", state->note_review->current_note + 1, state->note_review->note_count);
     }
     ImGui::Text("%s", fmt_buff);
+
+    snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu flashes completed in note", state->note_review->current_flash, state->note_review->notes[state->note_review->current_note]->flash_count);
+    ImGui::Text("%s", fmt_buff);
+
     snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%d correct", state->note_review->correct);
     ImGui::Text("%s", fmt_buff);
+
     snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%d incorrect", state->note_review->incorrect);
     ImGui::Text("%s", fmt_buff);
 

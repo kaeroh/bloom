@@ -4,6 +4,8 @@
 
 #include "arena.h"
 
+#include <SDL3/SDL_render.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -20,7 +22,9 @@ typedef struct cez_String {
 
 typedef struct Card {
     char *front;
+    SDL_Texture *front_image;
     char *back;
+    SDL_Texture *back_image;
 } Card;
 
 typedef struct Cloze {

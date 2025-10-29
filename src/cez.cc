@@ -2,7 +2,8 @@
 #define ARENA_IMPLEMENTATION
 #include "arena.h"
 
-#include <xxh3.h>
+#include <SDL3_image/SDL_image.h>
+
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -12,29 +13,10 @@
 #define START_FLASH_CAPACITY 8
 #define READ_BUFF_CAP 1024
 
-// TODO: (syd) make the organization of this file not shit
-// TODO: (syd) maybe don't have the API caller store the actual pointer to the
-// data, keep it here so you can shutdown...
-
 static Arena graph_arena = {0};
 // buffer for creating absolute path from relative
 static char absolute_buffer[512];
 static Notes notes = {0};
-
-// data handling
-
-typedef struct KV {
-    char *key;
-    uint64_t value;
-} KV;
-
-typedef struct HashMap {
-    KV *items;
-    size_t count;
-    size_t capacity;
-} HashMap;
-
-// hidden crap
 
 typedef struct Review {
     Flash *nodes;
@@ -49,7 +31,6 @@ typedef struct Graph {
     size_t note_capacity;
     size_t note_count;
     const char *base_dir;
-    HashMap map;
 } Graph;
 
 #define return_defer(value) do { result = (value); goto defer; } while(0)
@@ -63,7 +44,7 @@ bool read_file(const char *abs_path, Graph *graph);
 bool recursive_file_load(const char *abs_path, Graph *graph);
 
 char *make_str(Arena *arena, const char *str);
-const char *get_absolute(const char *relative_path, const Graph *graph);
+const char *get_absolute(const char *relative_path);
 const char *get_relative(const char *abs_path, const Graph *graph);
 void realloc_flashes(Note *note);
 void delete_note(Graph *graph, Note *note);
@@ -233,6 +214,18 @@ void cez_shutdown() {
 
 // - - - underlying hidden functions - - -
 
+// add a new card to a note by indexes of front and back
+void process_card(
+        Note *note, uint64_t front_start_index, 
+        uint64_t front_back_index, 
+        uint64_t back_start_index, 
+        uint64_t back_end_index
+        );
+// loads the first linked image in the front and back of a card (if present)
+bool parse_images(Arena *arena, Flash *flash);
+void clean_syntax(char *str);
+SDL_Texture *load_image(char *relative_path);
+
 void nprint(const char *str, int n) {
     for (int i = 0; i < n; i++) {
         fprintf(stderr, "%c", str[i]);
@@ -267,6 +260,14 @@ void cez_log(LogLevel level, const char *fmt, ...) {
 // makes a new note from a file
 // the only way of creating a note?
 bool read_file(const char *abs_path, Graph *graph) {
+
+    // CURRENT: image loading
+    // - load image as SDL_Surface
+    // - convert image to SDL_Texture
+    // - store texture with flash
+    // Will have to figure out a better way to load flashes - create a dedicated
+    // function to load them and parse cards to images
+
 	cez_log(INFO, "reading file: %s", abs_path);
     bool result = true;
     FILE *in = NULL;
@@ -285,6 +286,7 @@ bool read_file(const char *abs_path, Graph *graph) {
     int32_t card_search_stage = 0;
     size_t card_start_index = 0;
     size_t new_card_index = 0;
+    uint64_t front_start_index, front_end_index, back_start_index, back_end_index;
 
     int32_t cloze_search_stage = 0;
     uint64_t new_cloze_index = 0;
@@ -314,75 +316,57 @@ bool read_file(const char *abs_path, Graph *graph) {
 
 
     // TODO: (syd) check for back of card not being filled to avoid incomplete cards
-    for (size_t index = 0; index < chars_read; index++) {
+    for (size_t i = 0; i < chars_read; i++) {
 
-        if (new_note->view_text[index] == '\n' && cloze_search_stage != 2) {
+        if (new_note->view_text[i] == '\n' && cloze_search_stage != 2) {
             // not allowing for clozes to be between lines
             if (cloze_search_stage == 1) {
                 cloze_search_stage = 0;
             }
 
-            last_newline_index = index;
+            last_newline_index = i;
         }
 
         switch(card_search_stage) {
         case 0: // finding start of front
-            if (new_note->view_text[index] == ';'
-             && new_note->view_text[index + 1] == ';') {
-
+            if (new_note->view_text[i] == ';'
+             && new_note->view_text[i + 1] == ';'
+             ) {
                 card_search_stage = 1;
-
-                card_start_index = index + 2;
+                front_start_index = i + 2;
             }
             break;
         case 1: // finding end of front
             if (
-                    new_note->view_text[index] == ';'
-                    && new_note->view_text[index + 1] == ';') {
-
+                    new_note->view_text[i] == ';'
+                    && new_note->view_text[i + 1] == ';'
+                ) {
                 card_search_stage = 2;
-
-                realloc_flashes(new_note);
-
-                size_t end_index = index;
-                size_t str_size = sizeof(char) * (end_index - card_start_index);
-
-                new_card_index = new_note->flash_count;
-                new_note->flash_count ++;
-                new_note->flashes[new_card_index].type = CEZ_CARD;
-                new_note->flashes[new_card_index].data.card.front = (char*)arena_alloc(&new_note->arena, str_size+1);
-
-                memcpy(new_note->flashes[new_card_index].data.card.front, &new_note->view_text[card_start_index], str_size);
-                new_note->flashes[new_card_index].data.card.front[str_size] = '\0';
+                front_end_index = i;
             }
             break;
         case 2: // finding start of back: "::"
             if (
-                    new_note->view_text[index] == ':'
-                    && new_note->view_text[index + 1] == ':') {
-
+                    new_note->view_text[i] == ':'
+                    && new_note->view_text[i + 1] == ':'
+                ) {
                 card_search_stage = 3;
-                card_start_index = index + 2;
+                back_start_index = i + 2;
             }
             break;
         case 3: // finding end of back: "::"
             if (
-                    new_note->view_text[index] == ':'
-                    && new_note->view_text[index + 1] == ':') {
-
+                    new_note->view_text[i] == ':'
+                    && new_note->view_text[i + 1] == ':'
+                ) {
                 card_search_stage = 0;
-
-                size_t end_index = index;
-                size_t str_size = sizeof(char) * (end_index - card_start_index);
-
-                new_note->flashes[new_card_index].data.card.back = (char*)arena_alloc(&new_note->arena, str_size+1);
-
-                memcpy(new_note->flashes[new_card_index].data.card.back, &new_note->view_text[card_start_index], str_size);
-                new_note->flashes[new_card_index].data.card.back[str_size] = '\0';
-                cez_log(INFO, "new card %d: \n%s\n%s", new_card_index, 
-                        new_note->flashes[new_card_index].data.card.front, 
-                        new_note->flashes[new_card_index].data.card.back
-                       );
+                back_end_index = i;
+                process_card(
+                        new_note, 
+                        front_start_index, 
+                        front_end_index, 
+                        back_start_index, 
+                        back_end_index);
             }
             break;
         default:
@@ -392,23 +376,23 @@ bool read_file(const char *abs_path, Graph *graph) {
 
         switch (cloze_search_stage) {
         case 0: // finding start of cloze ({{)
-            if (new_note->view_text[index] == '{' && new_note->view_text[index+1] == '{') {
+            if (new_note->view_text[i] == '{' && new_note->view_text[i+1] == '{') {
                 cloze_search_stage = 1;
             }
             break;
         case 1: // finding end of cloze (}})
-            if (new_note->view_text[index] == '}' && new_note->view_text[index+1] == '}') {
+            if (new_note->view_text[i] == '}' && new_note->view_text[i+1] == '}') {
                 cloze_search_stage = 2;
                 cez_log(INFO, "moving to last stage of cloze reading");
             }
             break;
         case 2: // finding newline to finish cloze
-            if (new_note->view_text[index] == '\n') {
+            if (new_note->view_text[i] == '\n') {
                 cloze_search_stage = 0;
 
                 realloc_flashes(new_note);
 
-                size_t end_index = index;
+                size_t end_index = i;
 
                 new_cloze_index = new_note->flash_count;
                 new_note->flashes[new_cloze_index].type = CEZ_CLOZE;
@@ -429,7 +413,7 @@ bool read_file(const char *abs_path, Graph *graph) {
                         new_note->flashes[new_cloze_index].data.cloze.review_text, 
                         new_note->flashes[new_cloze_index].data.cloze.view_text
                        );
-                last_newline_index = index;
+                last_newline_index = i;
             }
             break;
         default:
@@ -447,6 +431,65 @@ bool read_file(const char *abs_path, Graph *graph) {
     }
 defer:
     return result;
+}
+
+void process_card(
+        Note *note, uint64_t front_start_index, 
+        uint64_t front_end_index, 
+        uint64_t back_start_index, 
+        uint64_t back_end_index
+        ) {
+    size_t front_size = sizeof(char) * (front_end_index - front_start_index);
+    size_t back_size = sizeof(char) * (back_end_index - front_start_index);
+
+    realloc_flashes(note);
+    Flash *flash = &note->flashes[note->flash_count];
+
+    flash->type = CEZ_CARD;
+    flash->data.card.front = (char*)arena_alloc(&note->arena, front_size);
+    flash->data.card.back = (char*)arena_alloc(&note->arena, back_size);
+
+    memcpy(flash->data.card.front, &note->view_text[front_start_index], front_size);
+    flash->data.card.front[front_size] = '\0';
+    memcpy(flash->data.card.back, &note->view_text[back_start_index], back_size);
+    flash->data.card.back[back_size] = '\0';
+
+    // process front and back strings to find images
+    // parse_images(&note->arena, flash);
+
+    note->flash_count ++;
+}
+
+bool parse_images(Arena *arena, Flash *flash) {
+    bool result = true;
+    SDL_Surface *surface = NULL;
+    char path_buff[128];
+    uint64_t path_start_index;
+    int8_t search_stage = 0;
+
+    for (uint64_t i = 0; i < strlen(flash->data.card.front); i++) {
+        if (flash->data.card.front[i] == '['
+          &&flash->data.card.front[i+1] == '['
+          &&search_stage == 0
+          ) {
+            search_stage = 1;
+            path_start_index = i + 2;
+        } 
+        else if (flash->data.card.front[i] == ']'
+          &&flash->data.card.front[i+1] == ']'
+          &&search_stage == 1
+          ) {
+            search_stage = 0;
+            assert(i  - path_start_index < 128);
+            memcpy(&path_buff, &flash->data.card.front[path_start_index], i - 1 - path_start_index);
+        }
+    }
+defer:
+    return result;
+}
+
+SDL_Texture *load_image(char *relative_path) {
+    return NULL;
 }
 
 void make_review_text(char *review_text, char *view_text) {
@@ -528,8 +571,8 @@ char *make_str(Arena *arena, const char *str) {
     return result;
 }
 
-const char *get_absolute(const char *relative_path, const Graph *graph) {
-    strcpy(absolute_buffer, graph->base_dir);
+const char *get_absolute(const char *relative_path) {
+    strcpy(absolute_buffer, graph.base_dir);
     strcat(absolute_buffer, relative_path);
     return absolute_buffer;
 }
@@ -551,14 +594,5 @@ void realloc_flashes(Note *note) {
         note->flashes = (Flash*)arena_realloc(&note->arena, note->flashes, sizeof(Flash) * note->flash_capacity, sizeof(Flash) * note->flash_capacity * 2);
         note->flash_capacity *= 2;
     }
-}
-
-uint64_t make_id(const char *relative_path) {
-    uint64_t id = XXH3_64bits(relative_path, sizeof(char) * strlen(relative_path)) % graph.note_capacity;
-    while (graph.notes[id]->occupied) {
-        id ++;
-        id %= graph.note_capacity;
-    }
-    return id;
 }
 
