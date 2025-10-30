@@ -1,3 +1,4 @@
+#include "cez.hpp"
 #include "definitions.hpp"
 
 void display_note_for_review(
@@ -28,21 +29,20 @@ void draw_review(
         const ReviewView *state
         ) {
     char fmt_buff[FMT_BUFF_CAPACITY];
-    ImGui::Begin("Reviewing notes", nullptr, ImGuiWindowFlags_NoMove);
+
+    if (cez_review_complete()) {
+        strcpy(fmt_buff, "Review complete");
+    } else {
+        snprintf(fmt_buff, FMT_BUFF_CAPACITY, "Reviewing: %s", state->note_review->notes[state->note_review->current_note]->relative_path);
+    }
+    ImGui::Begin(fmt_buff, nullptr, ImGuiWindowFlags_NoMove);
     ImGui::SetWindowSize(ImVec2(scale_w(0.69), scale_h(0.96)));
     ImGui::SetWindowPos(ImVec2(scale_w(0.01), scale_h(0.02)));
 
-    if (cez_review_complete()) {
-        ImGui::Text("Review complete");
-    } else {
-        ImGui::Text("%s", state->note_review->notes[state->note_review->current_note]->relative_path);
-
-        display_note_for_review(
-                state->note_review->notes[state->note_review->current_note], 
-                state->note_review->current_flash, 
-                state->note_review->showing_front);
-    }
-
+    display_note_for_review(
+            state->note_review->notes[state->note_review->current_note], 
+            state->note_review->current_flash, 
+            state->note_review->showing_front);
 
     ImGui::End();
 

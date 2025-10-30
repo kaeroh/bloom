@@ -480,7 +480,7 @@ bool parse_images(Arena *arena, Flash *flash) {
           &&search_stage == 1
           ) {
             search_stage = 0;
-            assert(i  - path_start_index < 128);
+            assert(i - path_start_index < 128);
             memcpy(&path_buff, &flash->data.card.front[path_start_index], i - 1 - path_start_index);
         }
     }

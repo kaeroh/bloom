@@ -36,12 +36,19 @@ typedef enum ExploringActiveWindow {
     EXPLORING_NOTES_LIST,
 } ExploringActiveWindow;
 
+typedef struct FuzzyFindData {
+    Arena *arena;
+    char *user_search;
+    char **search_space;
+} FuzzyFindData;
+
 typedef struct ExploringView {
     size_t selected_notes[SELECTED_NOTES_CAPACITY];
     size_t selected_notes_count;
     uint64_t highlighted_note;
     uint64_t highlighted_selected_note;
     ExploringActiveWindow active_window;
+    FuzzyFindData fuzzy_find;
 } ExploringView;
 
 typedef struct State {
