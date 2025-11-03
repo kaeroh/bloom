@@ -53,13 +53,16 @@ void draw_review(const ReviewView *state) {
 
         if (cez_review_complete()) {
                 snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu notes completed", state->note_review->current_note, state->note_review->note_count);
+                ImGui::Text("%s", fmt_buff);
+                snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu flashes completed in note", cez_get_current_shown_note()->flash_count, cez_get_current_shown_note()->flash_count);
+                ImGui::Text("%s", fmt_buff);
         } else {
                 snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu notes completed", state->note_review->current_note + 1, state->note_review->note_count);
+                ImGui::Text("%s", fmt_buff);
+                snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu flashes completed in note", state->note_review->current_flash, cez_get_current_shown_note()->flash_count);
+                ImGui::Text("%s", fmt_buff);
         }
-        ImGui::Text("%s", fmt_buff);
 
-        snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%lu/%lu flashes completed in note", state->note_review->current_flash, cez_get_current_shown_note()->flash_count);
-        ImGui::Text("%s", fmt_buff);
 
         snprintf(fmt_buff, FMT_BUFF_CAPACITY, "%d correct", state->note_review->correct);
         ImGui::Text("%s", fmt_buff);

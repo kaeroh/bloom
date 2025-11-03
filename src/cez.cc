@@ -2,8 +2,6 @@
 #define ARENA_IMPLEMENTATION
 #include "arena.h"
 
-#include <SDL3_image/SDL_image.h>
-
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>

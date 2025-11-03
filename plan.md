@@ -23,7 +23,8 @@ Main UI frontend, searches folders, interfaces with cez backend
 
 # todo list
 
-- [ ] randomize review order
+- [x] randomize review order
+- [ ] fix the weird font handling
 - [ ] recursive card reading? - cards inside of cards
 - [ ] expand markdown format to make cards out of markdown "#" headers?
 
