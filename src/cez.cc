@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define START_CAPACITY 128
 #define START_FLASH_CAPACITY 8
@@ -58,24 +59,26 @@ void make_review_text(char *review_text, char *view_text);
 // - - - top level API implementation - - -
 
 const Graph *cez_load_graph(const char *dir) {
-    graph.base_dir = make_str(&graph_arena, dir);
-    graph.notes = (Note **)arena_alloc(&graph_arena, sizeof(Note) * START_CAPACITY);
-    graph.note_count = 0;
-    graph.note_capacity = START_CAPACITY;
-    graph.edges = (Edge *)arena_alloc(&graph_arena, sizeof(Edge) * START_CAPACITY);
-    graph.edge_capacity = START_CAPACITY;
+        graph.base_dir = make_str(&graph_arena, dir);
+        graph.notes = (Note **)arena_alloc(&graph_arena, sizeof(Note) * START_CAPACITY);
+        graph.note_count = 0;
+        graph.note_capacity = START_CAPACITY;
+        graph.edges = (Edge *)arena_alloc(&graph_arena, sizeof(Edge) * START_CAPACITY);
+        graph.edge_capacity = START_CAPACITY;
 
-    note_review.notes = NULL;
-    /*
-    if (!note_review.notes) {
-        cez_log(ERROR, "Failed to alloc note_review.notes: %d", __LINE__);
-        return NULL;
-    }
-    */
+        srand(time(NULL));
 
-    recursive_file_load(dir, &graph);
+        note_review.notes = NULL;
+        /*
+           if (!note_review.notes) {
+           cez_log(ERROR, "Failed to alloc note_review.notes: %d", __LINE__);
+           return NULL;
+           }
+           */
 
-    return &graph;
+        recursive_file_load(dir, &graph);
+
+        return &graph;
 };
 
 const Note *get_note(const char *relative_path) {
@@ -88,17 +91,17 @@ const Note *get_note(const char *relative_path) {
 }
 
 void shuffle_notes(Note **notes, uint64_t len) {
-    if (len < 1) return;
-    Note *tmp = NULL;
-    uint64_t b = 0;
-    for (uint64_t i = len-1; i > 1; i--) {
-        b = rand()%(i-1);
-        tmp = notes[b];
-        cez_log(INFO, "Swapping: %lu, %lu", b, i);
+        if (len < 1) return;
+        Note *tmp = NULL;
+        uint64_t b = 0;
+        for (uint64_t i = len-1; i > 1; i--) {
+                b = rand()%(i-1);
+                tmp = notes[b];
+                cez_log(INFO, "Swapping: %lu, %lu", b, i);
 
-        notes[b] = notes[i];
-        notes[i] = tmp;
-    }
+                notes[b] = notes[i];
+                notes[i] = tmp;
+        }
 }
 
 void shuffle_flashes(Flash *flashes, uint64_t len) {
@@ -200,6 +203,17 @@ void cez_review_incorrect_answer() {
 
 bool cez_review_complete() {
     return note_review.current_note >= note_review.note_count;
+}
+
+const Note *cez_get_current_shown_note() {
+        if (note_review.note_count < 1) {
+                return NULL;
+        }
+        if (cez_review_complete()) {
+                return note_review.notes[note_review.current_note - 1];
+        } else {
+                return note_review.notes[note_review.current_note];
+        }
 }
 
 const Notes *get_notes() {
@@ -434,20 +448,21 @@ defer:
 }
 
 void process_card(
-        Note *note, uint64_t front_start_index, 
+        Note *note, 
+        uint64_t front_start_index, 
         uint64_t front_end_index, 
         uint64_t back_start_index, 
         uint64_t back_end_index
         ) {
     size_t front_size = sizeof(char) * (front_end_index - front_start_index);
-    size_t back_size = sizeof(char) * (back_end_index - front_start_index);
+    size_t back_size = sizeof(char) * (back_end_index - back_start_index);
 
     realloc_flashes(note);
     Flash *flash = &note->flashes[note->flash_count];
 
     flash->type = CEZ_CARD;
-    flash->data.card.front = (char*)arena_alloc(&note->arena, front_size);
-    flash->data.card.back = (char*)arena_alloc(&note->arena, back_size);
+    flash->data.card.front = (char*)arena_alloc(&note->arena, front_size + 1);
+    flash->data.card.back = (char*)arena_alloc(&note->arena, back_size + 1);
 
     memcpy(flash->data.card.front, &note->view_text[front_start_index], front_size);
     flash->data.card.front[front_size] = '\0';

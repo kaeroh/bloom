@@ -98,6 +98,7 @@ void cez_show_back();
 void cez_review_correct_answer();
 void cez_review_incorrect_answer();
 bool cez_review_complete();
+const Note *cez_get_current_shown_note();
 void cez_log(LogLevel level, const char *fmt, ...);
 
 #endif // CEZ_H_
